@@ -132,9 +132,18 @@ var SampleApp = function() {
                 '  <body>\n<br/>\n' + content + '</body>\n</html>');
         };
 
+
         self.routes['/'] = function(req, res) {
+            res.setHeader('Content-Type', 'text/html');
+            res.send(fs.readFileSync('./index.html'));
+
+        };
+
+        self.routes['apeazzy'] = function(req, res) {
+
             res.set('Content-Type', 'text/html');
-            res.send(self.cache_get('index.html'));
+            res.send(fs.readFileSync('./apeazzy.html'));
+
         };
     };
 
@@ -171,6 +180,18 @@ var SampleApp = function() {
      *  Start the server (starts up the sample application).
      */
     self.start = function() {
+
+        /*
+        var urlstring = "";
+
+        request(urlstring, function(error, response, body) {
+         
+        console.log( body );
+          
+         // console.log(body);
+        });*/
+
+
         //  Start the app on the specific interface (and port).
 
         self.app.use(express.static(path.join(__dirname, 'public')));
@@ -182,7 +203,7 @@ var SampleApp = function() {
 
         ).on('connection', function(socket) {
             count++
-            console.log('a user connected @ '+new Date().getTime()+' :: '+ count);
+            console.log('a user connected @ ' + new Date().getTime() + ' :: ' + count);
 
         });
     };

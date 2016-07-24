@@ -1,0 +1,130 @@
+html{
+position: relative;
+height: 100%;
+width: 100%;
+margin: 0;
+padding:0;
+font-family: helvetica
+
+}
+
+body{
+position: relative;
+height: 100%;
+width: 100%;
+margin: 0;
+padding:0;
+
+
+}
+
+.bcent{
+position: relative;
+height: 100%;
+width: 100%;
+margin: 0;
+padding:0;
+
+
+}
+
+
+
+.urlput{
+    position: relative;
+    height: 30px;
+    font-size: 25px;
+    width: 50%;
+
+
+}
+
+
+.brow{
+position: relative;
+margin: 5px 0px
+}
+
+
+.nfbt{
+
+position: relative;
+padding: 5px;
+background-color: blue;
+color: white;
+
+border: 1px solid purple;
+
+cursor:pointer;
+
+}
+
+
+
+.obtabcon{
+position: relative;
+border:1px solid: grey;
+
+width:50%;
+
+
+}
+
+
+.obtab{
+position: relative;
+table-layout: fixed;
+width: 100%
+
+}
+
+
+
+.fput{
+	position: relative;
+	height:30px;
+	font-size: 30px;
+	font-family: inherit;
+width:100%;
+border: 1px solid lightgrey;
+
+}
+
+
+
+
+
+.rspace{
+
+
+position: absolute;
+top:0px;
+left:50%;
+border: 1px solid black;
+height: 100%;
+overflow:scroll;
+
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
