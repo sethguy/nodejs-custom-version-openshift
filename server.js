@@ -1,8 +1,15 @@
 #!/bin/env node
-//  OpenShift sample Node application
+ //  OpenShift sample Node application
 var express = require('express');
-var fs      = require('fs');
-
+var fs = require('fs');
+var Mongo = require('mongodb'),
+    assert = require('assert');
+var Grid = require('gridfs-stream');
+var MongoClient = Mongo.MongoClient;
+var ObjectId = require('mongodb').ObjectID;
+Object.assign = require('object-assign')
+var path = require('path');
+var io = require('socket.io');
 
 /**
  *  Define the sample application.
@@ -22,17 +29,20 @@ var SampleApp = function() {
      */
     self.setupVariables = function() {
         //  Set the environment variables we need.
-        self.ipaddress = process.env.OPENSHIFT_NODEJS_IP ||
-                         process.env.OPENSHIFT_INTERNAL_IP;
-        self.port      = process.env.OPENSHIFT_NODEJS_PORT   ||
-                         process.env.OPENSHIFT_INTERNAL_PORT || 8080;
+        self.ipaddress = process.env.OPENSHIFT_NODEJS_IP || "127.0.0.1";
+        self.port = process.env.OPENSHIFT_NODEJS_PORT || 8080;
 
-        if (typeof self.ipaddress === "undefined") {
+        /*if (typeof self.ipaddress === "undefined") {
             //  Log errors on OpenShift but continue w/ 127.0.0.1 - this
             //  allows us to run/test the app locally.
-            console.warn('No OPENSHIFT_*_IP var, using 127.0.0.1');
+            console.warn('No OPENSHIFT_NODEJS_IP var, using 127.0.0.1');
             self.ipaddress = "127.0.0.1";
-        };
+
+        };*/
+
+        self.relLink = 'http://' + self.ipaddress + ':' + self.port + '/';
+        self.mongourl = 'mongodb://' + self.ipaddress + ':27017/';
+
     };
 
 
@@ -53,7 +63,9 @@ var SampleApp = function() {
      *  Retrieve entry (content) from cache.
      *  @param {string} key  Key identifying content to retrieve from cache.
      */
-    self.cache_get = function(key) { return self.zcache[key]; };
+    self.cache_get = function(key) {
+        return self.zcache[key];
+    };
 
 
     /**
@@ -61,26 +73,26 @@ var SampleApp = function() {
      *  Terminate server on receipt of the specified signal.
      *  @param {string} sig  Signal to terminate on.
      */
-    self.terminator = function(sig){
+    self.terminator = function(sig) {
         if (typeof sig === "string") {
-           console.log('%s: Received %s - terminating sample app ...',
-                       Date(Date.now()), sig);
-           process.exit(1);
+            console.log('%s: Received %s - terminating sample app ...',
+                Date(Date.now()), sig);
+            process.exit(1);
         }
-        console.log('%s: Node server stopped.', Date(Date.now()) );
+        console.log('%s: Node server stopped.', Date(Date.now()));
     };
 
 
     /**
      *  Setup termination handlers (for exit and a list of signals).
      */
-    self.setupTerminationHandlers = function(){
+    self.setupTerminationHandlers = function() {
         //  Process on exit and signals.
         process.on('exit', function() { self.terminator(); });
 
         // Removed 'SIGPIPE' from the list - bugz 852598.
         ['SIGHUP', 'SIGINT', 'SIGQUIT', 'SIGILL', 'SIGTRAP', 'SIGABRT',
-         'SIGBUS', 'SIGFPE', 'SIGUSR1', 'SIGSEGV', 'SIGUSR2', 'SIGTERM'
+            'SIGBUS', 'SIGFPE', 'SIGUSR1', 'SIGSEGV', 'SIGUSR2', 'SIGTERM'
         ].forEach(function(element, index, array) {
             process.on(element, function() { self.terminator(element); });
         });
@@ -95,7 +107,7 @@ var SampleApp = function() {
      *  Create the routing table entries + handlers for the application.
      */
     self.createRoutes = function() {
-        self.routes = { };
+        self.routes = {};
 
         // Routes for /health, /asciimo, /env and /
         self.routes['/health'] = function(req, res) {
@@ -109,20 +121,20 @@ var SampleApp = function() {
 
         self.routes['/env'] = function(req, res) {
             var content = 'Version: ' + process.version + '\n<br/>\n' +
-                          'Env: {<br/>\n<pre>';
+                'Env: {<br/>\n<pre>';
             //  Add env entries.
             for (var k in process.env) {
-               content += '   ' + k + ': ' + process.env[k] + '\n';
+                content += '   ' + k + ': ' + process.env[k] + '\n';
             }
             content += '}\n</pre><br/>\n'
             res.send('<html>\n' +
-                     '  <head><title>Node.js Process Env</title></head>\n' +
-                     '  <body>\n<br/>\n' + content + '</body>\n</html>');
+                '  <head><title>Node.js Process Env</title></head>\n' +
+                '  <body>\n<br/>\n' + content + '</body>\n</html>');
         };
 
         self.routes['/'] = function(req, res) {
             res.set('Content-Type', 'text/html');
-            res.send(self.cache_get('index.html') );
+            res.send(self.cache_get('index.html'));
         };
     };
 
@@ -160,15 +172,35 @@ var SampleApp = function() {
      */
     self.start = function() {
         //  Start the app on the specific interface (and port).
-        self.app.listen(self.port, self.ipaddress, function() {
-            console.log('%s: Node server started on %s:%d ...',
-                        Date(Date.now() ), self.ipaddress, self.port);
+
+        self.app.use(express.static(path.join(__dirname, 'public')));
+        io.listen(
+            self.app.listen(self.port, self.ipaddress, function() {
+                console.log('%s: Node server started on %s:%d ...',
+                    Date(Date.now()), self.ipaddress, self.port);
+            })
+
+        ).on('connection', function(socket) {
+            count++
+            console.log('a user connected @ '+new Date().getTime()+' :: '+ count);
+
         });
     };
 
-};   /*  Sample Application.  */
+}; /*  Sample Application.  */
+
+var mongogetdb = function(calli) {
+    // Use connect method to connect to the Server
+    MongoClient.connect(self.mongourl, function(err, db) {
+        if (err) throw err;
+        //console.log("Connected correctly to server");
+
+        calli(db); //insert method
+
+    }); //mongo connect
 
 
+};
 
 /**
  *  main():  Main code.
@@ -176,4 +208,3 @@ var SampleApp = function() {
 var zapp = new SampleApp();
 zapp.initialize();
 zapp.start();
-
