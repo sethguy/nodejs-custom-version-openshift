@@ -13,6 +13,8 @@ var io = require('socket.io');
 var request = require('request');
 var count = 0;
 var onCount = 0;
+var USERSCOLLECTION = "Users";
+var dbName = ""
 
 /**
  *  Define the sample application.
@@ -44,8 +46,9 @@ var SampleApp = function() {
         };*/
 
         self.relLink = 'http://' + self.ipaddress + ':' + self.port + '/';
-        self.mongourl = 'mongodb://' + self.ipaddress + ':27017/';
+        self.mongourl = 'mongodb://' + self.ipaddress + ':27017/'+dbName;
 
+       // console.log( "monogo" , self.mongourl );
     };
 
 
@@ -147,7 +150,84 @@ var SampleApp = function() {
             res.send(fs.readFileSync('./apeazzy.html'));
 
         };
-    };
+
+
+        self.routes['/signUp/:email/:pass'] = function(req, res) {
+
+            var newCreds = {
+                email: req.params.email,
+                pass: req.params.pass
+            }
+
+            var sertuser = function(db, callback) {
+                    // Get the documents collection
+                    var collection = db.collection(USERSCOLLECTION);
+
+                    //bcrypt.hash(newCreds.pass, saltRounds, function(err, hash) {
+                    // Store hash in your password DB.
+                    collection.insert([{
+                        "email": newCreds.email,
+                        "password": newCreds.pass
+                    }, ], function(err, result) {
+                        callback(result);
+                    });
+
+                    //});
+
+                    // Find some documents
+
+                } //sertuser
+
+
+            // Use connect method to connect to the Server
+            MongoClient.connect(self.mongourl, function(err, db) {
+                if (err) throw err;
+                //console.log("Connected correctly to server");
+
+                sertuser(db, function(docs) {
+
+                    res.send(info);
+
+                    var result = JSON.stringify(docs);
+
+                }); //insert method
+
+
+            }); //mongo connect
+        };
+
+        self.routes['/ck/:email/:password'] = function(req, res) {
+
+            var ckuser = function(db, callback) {
+                // Get the documents collection
+                var collection = db.collection(USERSCOLLECTION);
+                // Find some documents
+                collection.find({ "password": req.param("password"), "email": req.param("email") }).toArray(function(err, docs) {
+
+                    console.dir(docs);
+                    callback(docs);
+                });
+            }
+
+            // Use connect method to connect to the Server
+            MongoClient.connect( self.mongourl , function(err, db) {
+                if (err) throw err;
+                //console.log("Connected correctly to server");
+                ckuser(db, function(docs) {
+                    var result = JSON.stringify(docs);
+                    console.log("");
+                    res.header("Access-Control-Allow-Origin", "*");
+                    res.header("Access-Control-Allow-Headers", "X-Requested-With");
+                    res.send(result);
+
+                    db.close();
+                }); //ck user method
+
+            }); //mongo connect
+
+        }; //ck route
+
+    };//ROUTES
 
 
     /**
@@ -181,21 +261,20 @@ var SampleApp = function() {
                         callback(docs);
                     } else {
 
-                        res.send("no3");
+                        res.send(err);
 
                     }
-
 
                 });
             }
 
-            MongoClient.connect(mongourl, function(err, db) {
+            MongoClient.connect(self.mongourl, function(err, db) {
                 if (!err) {
-
-
                     findimg(db, function(docs) {
                         var result = JSON.stringify(docs);
+
                         console.log(result);
+
                         if (docs[0] != null) {
 
                             var uid = docs[0]._id;
@@ -213,21 +292,16 @@ var SampleApp = function() {
 
                         } else {
 
-                            res.send("no1");
+                            res.send("");
 
                         }
 
                     }); //find docs method
 
                 } else {
-
-                    res.send("no2");
-
+                    res.send( err );
                 }
-
-
             }); //mongo connect
-
 
         });
 
@@ -236,7 +310,7 @@ var SampleApp = function() {
             res.header("Access-Control-Allow-Origin", "*");
             res.header("Access-Control-Allow-Headers", "X-Requested-With");
 
-            MongoClient.connect(mongourl, function(err, db) {
+            MongoClient.connect(self.mongourl, function(err, db) {
                 if (err) throw err;
 
                 var form = new formidable.IncomingForm();
@@ -247,12 +321,11 @@ var SampleApp = function() {
                     if (!err) {
                         console.log('File uploaded : ' + files.file.path);
 
-                        var gfs = grid(db, Mongo);
+                        var gfs = grid( db , Mongo );
                         var writestream = gfs.createWriteStream({
                             filename: files.file.name,
                             /*metadata: {
-                                user_id: fields.uid,
-                                type: 'main'
+
                             }*/
                         });
 
@@ -261,12 +334,13 @@ var SampleApp = function() {
                             .resize(600, 800, '!')
                             .write(files.file.path, function(err) {
                                 if (err) {
-                                    res.json(":::" + err);
+                                    res.json(err);
                                 }
 
                                 fs.createReadStream(files.file.path).pipe(writestream);
 
                                 if (!err) console.log('done');
+                                
                             }); // image resizing
 
                         writestream.on('close', function(file) {
@@ -338,7 +412,9 @@ var SampleApp = function() {
         //  Start the app on the specific interface (and port).
 
         self.app.use(express.static(path.join(__dirname, 'public')));
+
         io.listen(
+
             self.app.listen(self.port, self.ipaddress, function() {
                 console.log('%s: Node server started on %s:%d ...',
                     Date(Date.now()), self.ipaddress, self.port);
@@ -349,12 +425,14 @@ var SampleApp = function() {
             onCount++;
             console.log('a user connected @ ' + new Date().getTime() + ' :: ' + count);
             console.log(' :: onCount ' + onCount);
+
             socket.on('disconnect', function(socket) {
                 console.log('a user connected @ ' + new Date().getTime() + ' :: ' + count);
                 onCount--;
                 console.log(' :: onCount ' + onCount);
 
             });
+
 
         });
     };
