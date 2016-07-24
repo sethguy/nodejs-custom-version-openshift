@@ -160,6 +160,147 @@ var SampleApp = function() {
         for (var r in self.routes) {
             self.app.get(r, self.routes[r]);
         }
+
+        self.app.get('/images/:id', function(req, res) {
+
+            // TODO: set proper mime type + filename, handle errors, etc...
+
+            var id = req.params.id;
+
+            var findimg = function(db, callback) {
+                // Get the documents collection
+                var collection = db.collection('fs.files');
+                // Find some documents
+                collection.find({ _id: ObjectId(id) }).toArray(function(err, docs) {
+                    if (!err) {
+
+                        console.log("Found the following records" + JSON.stringify(docs));
+                        console.dir(docs);
+                        callback(docs);
+                    } else {
+
+                        res.send("no3");
+
+                    }
+
+
+                });
+            }
+
+            MongoClient.connect(mongourl, function(err, db) {
+                if (!err) {
+
+
+                    findimg(db, function(docs) {
+                        var result = JSON.stringify(docs);
+                        console.log(result);
+                        if (docs[0] != null) {
+
+                            var uid = docs[0]._id;
+
+                            var gfs = grid(db, Mongo);
+
+                            res.header("Access-Control-Allow-Origin", "*");
+                            res.header("Access-Control-Allow-Headers", "X-Requested-With");
+
+                            gfs
+                            // create a read stream from gfs...
+                                .createReadStream({ _id: uid })
+                                // and pipe it to Express' response
+                                .pipe(res);
+
+                        } else {
+
+                            res.send("no1");
+
+                        }
+
+                    }); //find docs method
+
+                } else {
+
+                    res.send("no2");
+
+                }
+
+
+            }); //mongo connect
+
+
+        });
+
+        self.app.post('/images', function(req, res) {
+
+            res.header("Access-Control-Allow-Origin", "*");
+            res.header("Access-Control-Allow-Headers", "X-Requested-With");
+
+            MongoClient.connect(mongourl, function(err, db) {
+                if (err) throw err;
+
+                var form = new formidable.IncomingForm();
+                form.uploadDir = __dirname;
+                form.keepExtensions = true;
+                form.parse(req, function(err, fields, files) {
+                    // console.log('feilds : ' + files.length);
+                    if (!err) {
+                        console.log('File uploaded : ' + files.file.path);
+
+                        var gfs = grid(db, Mongo);
+                        var writestream = gfs.createWriteStream({
+                            filename: files.file.name,
+                            /*metadata: {
+                                user_id: fields.uid,
+                                type: 'main'
+                            }*/
+                        });
+
+
+                        gm(files.file.path)
+                            .resize(600, 800, '!')
+                            .write(files.file.path, function(err) {
+                                if (err) {
+                                    res.json(":::" + err);
+                                }
+
+                                fs.createReadStream(files.file.path).pipe(writestream);
+
+                                if (!err) console.log('done');
+                            }); // image resizing
+
+                        writestream.on('close', function(file) {
+                            // do something with `file`
+
+                            res.json({
+                                id: file._id,
+                                href: relLink + 'images/' + file._id
+                            });
+
+                            //redirect
+                            fs.unlink(files.file.path, function(err) {
+                                if (err) {
+                                    return console.error(err);
+                                }
+                                console.log("File deleted successfully!");
+                            });
+
+                        }); // writestream on close
+
+
+                    } else {
+                        console.log('File uploaded : ' + err);
+                        res.json("no");
+
+                    } // formidable error error   
+
+                    // res.send(result);
+
+                }); //form.parse
+
+
+            }); //mongo connect
+
+
+        }); // images
     };
 
 
@@ -220,8 +361,45 @@ var mongogetdb = function(calli) {
 
     }); //mongo connect
 
-
 };
+
+var updateDocumentbyid = function(db, table, id, set, callback) {
+    // Get the documents collection
+    var collection = db.collection(table);
+    // Update document where a is 2, set b equal to 1
+    collection.updateOne({ _id: new ObjectId(id) }
+
+        , { $set: set },
+
+        function(err, result) {
+
+            callback(result, err);
+
+        });
+}
+
+var sertobj = function(db, table, obj, callback) {
+
+        // Get the documents collection
+        var collection = db.collection(table);
+
+        collection.insert(obj, function(err, result) {
+
+            callback(result, err);
+
+        });
+
+    } //sertobj
+
+var findby = function(db, table, terms, ops, calli) {
+
+        db.collection(table).find(terms).toArray(function(err, docs) {
+
+            calli(docs, err);
+
+        });
+
+    } //getby
 
 /**
  *  main():  Main code.
