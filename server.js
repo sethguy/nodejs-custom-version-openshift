@@ -1,5 +1,5 @@
 #!/bin/env node
- //  OpenShift sample Node application
+ //  soopedUp  node starter
 var express = require('express');
 var fs = require('fs');
 var Mongo = require('mongodb'),
@@ -10,6 +10,9 @@ var ObjectId = require('mongodb').ObjectID;
 Object.assign = require('object-assign')
 var path = require('path');
 var io = require('socket.io');
+var request = require('request');
+var count = 0;
+var onCount = 0;
 
 /**
  *  Define the sample application.
@@ -136,7 +139,6 @@ var SampleApp = function() {
         self.routes['/'] = function(req, res) {
             res.setHeader('Content-Type', 'text/html');
             res.send(fs.readFileSync('./index.html'));
-
         };
 
         self.routes['apeazzy'] = function(req, res) {
@@ -343,8 +345,16 @@ var SampleApp = function() {
             })
 
         ).on('connection', function(socket) {
-            count++
+            count++;
+            onCount++;
             console.log('a user connected @ ' + new Date().getTime() + ' :: ' + count);
+            console.log(' :: onCount ' + onCount);
+            socket.on('disconnect', function(socket) {
+                console.log('a user connected @ ' + new Date().getTime() + ' :: ' + count);
+                onCount--;
+                console.log(' :: onCount ' + onCount);
+
+            });
 
         });
     };
