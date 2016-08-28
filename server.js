@@ -14,11 +14,14 @@ var request = require('request');
 var count = 0;
 var onCount = 0;
 var USERSCOLLECTION = "Users";
-var dbName = ""
-
-/**
- *  Define the sample application.
- */
+var dbName = "";
+var bcrypt = require('bcryptjs');
+var saltRounds = 10;
+var nodemailer = require('nodemailer');
+var bodyParser = require('body-parser')
+    /**
+     *  Define the sample application.
+     */
 var SampleApp = function() {
 
     //  Scope.
@@ -46,9 +49,9 @@ var SampleApp = function() {
         };*/
 
         self.relLink = 'http://' + self.ipaddress + ':' + self.port + '/';
-        self.mongourl = 'mongodb://' + self.ipaddress + ':27017/'+dbName;
+        self.mongourl = 'mongodb://' + self.ipaddress + ':27017/' + dbName;
 
-       // console.log( "monogo" , self.mongourl );
+        // console.log( "monogo" , self.mongourl );
     };
 
 
@@ -152,50 +155,6 @@ var SampleApp = function() {
         };
 
 
-        self.routes['/signUp/:email/:pass'] = function(req, res) {
-
-            var newCreds = {
-                email: req.params.email,
-                pass: req.params.pass
-            }
-
-            var sertuser = function(db, callback) {
-                    // Get the documents collection
-                    var collection = db.collection(USERSCOLLECTION);
-
-                    //bcrypt.hash(newCreds.pass, saltRounds, function(err, hash) {
-                    // Store hash in your password DB.
-                    collection.insert([{
-                        "email": newCreds.email,
-                        "password": newCreds.pass
-                    }, ], function(err, result) {
-                        callback(result);
-                    });
-
-                    //});
-
-                    // Find some documents
-
-                } //sertuser
-
-
-            // Use connect method to connect to the Server
-            MongoClient.connect(self.mongourl, function(err, db) {
-                if (err) throw err;
-                //console.log("Connected correctly to server");
-
-                sertuser(db, function(docs) {
-
-                    res.send(info);
-
-                    var result = JSON.stringify(docs);
-
-                }); //insert method
-
-
-            }); //mongo connect
-        };
-
         self.routes['/ck/:email/:password'] = function(req, res) {
 
             var ckuser = function(db, callback) {
@@ -210,7 +169,7 @@ var SampleApp = function() {
             }
 
             // Use connect method to connect to the Server
-            MongoClient.connect( self.mongourl , function(err, db) {
+            MongoClient.connect(self.mongourl, function(err, db) {
                 if (err) throw err;
                 //console.log("Connected correctly to server");
                 ckuser(db, function(docs) {
@@ -227,7 +186,7 @@ var SampleApp = function() {
 
         }; //ck route
 
-    };//ROUTES
+    }; //ROUTES
 
 
     /**
@@ -299,11 +258,59 @@ var SampleApp = function() {
                     }); //find docs method
 
                 } else {
-                    res.send( err );
+                    res.send(err);
                 }
             }); //mongo connect
 
         });
+
+
+        self.app.post('signUp', function(req, res) {
+
+
+            var newCreds = {
+                email: req.body.email,
+                pass: req.body.pass
+            }
+
+            var sertuser = function(db, callback) {
+                    // Get the documents collection
+                    var collection = db.collection(USERSCOLLECTION);
+
+                    bcrypt.hash(newCreds.pass, saltRounds, function(err, hash) {
+                        // Store hash in your password DB.
+                        collection.insert([{
+                            "email": newCreds.email,
+                            "password": hash
+                        }, ], function(err, result) {
+                            callback(result);
+                        });
+
+                    });
+
+                    // Find some documents
+
+                } //sertuser
+
+
+            // Use connect method to connect to the Server
+            MongoClient.connect(self.mongourl, function(err, db) {
+                if (err) throw err;
+                //console.log("Connected correctly to server");
+
+                sertuser(db, function(docs) {
+
+                    res.send(info);
+
+                    var result = JSON.stringify(docs);
+
+                }); //insert method
+
+
+            }); //mongo connect
+
+
+        })
 
         self.app.post('/images', function(req, res) {
 
@@ -321,7 +328,7 @@ var SampleApp = function() {
                     if (!err) {
                         console.log('File uploaded : ' + files.file.path);
 
-                        var gfs = grid( db , Mongo );
+                        var gfs = grid(db, Mongo);
                         var writestream = gfs.createWriteStream({
                             filename: files.file.name,
                             /*metadata: {
@@ -340,7 +347,7 @@ var SampleApp = function() {
                                 fs.createReadStream(files.file.path).pipe(writestream);
 
                                 if (!err) console.log('done');
-                                
+
                             }); // image resizing
 
                         writestream.on('close', function(file) {
@@ -412,6 +419,11 @@ var SampleApp = function() {
         //  Start the app on the specific interface (and port).
 
         self.app.use(express.static(path.join(__dirname, 'public')));
+
+        self.app.use(bodyParser.json()); // to support JSON-encoded bodies
+        self.app.use(bodyParser.urlencoded({ // to support URL-encoded bodies
+            extended: true
+        }));
 
         io.listen(
 
